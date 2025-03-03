@@ -8,7 +8,6 @@ load_dotenv()
 
 api_key = os.getenv("CLOUDFLARE_API_KEY")
 cloudflare_account = os.getenv("CLOUDFLARE_ACCOUNT_ID")
-cloudflare_email = os.getenv("CLOUDFLARE_EMAIL")
 zone_id = os.getenv("CLOUDFLARE_ZONE_ID")
 dns_record_id = os.getenv("CLOUDFLARE_DNS_RECORD_ID")
 a_record_name = os.getenv("CLOUDFLARE_A_RECORD_NAME")
