@@ -20,6 +20,7 @@ This should be run on a cron schedule from the server/device that is hosting the
 
 * httpx
 * dotenv
+* datetime
 
 ### Installing
 
