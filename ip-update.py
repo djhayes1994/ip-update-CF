@@ -1,63 +1,45 @@
 import os
 
-import httpx
-import json
+from utilities.cf import CloudFlareUtil as cf
+from utilities.logger import Logger
+from utilities.helper import get_ip
+
 from dotenv import load_dotenv
 
+log = Logger()
 load_dotenv()
 
-api_key = os.getenv("CLOUDFLARE_API_KEY")
-cloudflare_account = os.getenv("CLOUDFLARE_ACCOUNT_ID")
-zone_id = os.getenv("CLOUDFLARE_ZONE_ID")
-dns_record_id = os.getenv("CLOUDFLARE_DNS_RECORD_ID")
-a_record_name = os.getenv("CLOUDFLARE_A_RECORD_NAME")
+api_key = os.getenv("CLOUDFLARE_API_KEY", None)
+cloudflare_account = os.getenv("CLOUDFLARE_ACCOUNT_ID", None)
+zone_id = os.getenv("CLOUDFLARE_ZONE_ID", None)
+dns_record_id = os.getenv("CLOUDFLARE_DNS_RECORD_ID", None)
+a_record_name = os.getenv("CLOUDFLARE_A_RECORD_NAME", None)
 
+log.info(f"Loaded environment variables from .env file.")
+data = {
+    "api_key": api_key,
+    "cf_account": cloudflare_account,
+    "zone_id": zone_id,
+    "dns_record_id": dns_record_id,
+    "a_record_name": a_record_name
+}
 
-def get_ip():
-    request = httpx.get('https://icanhazip.com')
-    return request.text.rstrip()
+cf_client = cf(data)
 
-def verify_token():
-    request_url = f'https://api.cloudflare.com/client/v4/accounts/{cloudflare_account}/tokens/verify'
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    response = httpx.get(request_url, headers=headers)
-    response_body = json.loads(response.content)
-    if response_body['result']['status'] == "active":
-        return True
+if cf_client.no_empty_data_values():
+    current_ip, ip_status = get_ip()
+    if ip_status:
+        valid_token = cf_client.verify_token()
+
+        if valid_token:
+
+            update_result = cf_client.update_zone_record(ip=current_ip)
+
+            if update_result:
+                log.info(f"Successfully updated zone record ({a_record_name}) with value of: {current_ip}")
+            else:
+                log.failure(f"Failed to update zone record ({a_record_name}) with value of: {current_ip}")
     else:
-        return False
-
-def update_zone_record(z_id,dr_id, ip):
-    request_url = f'https://api.cloudflare.com/client/v4/zones/{z_id}/dns_records/{dr_id}'
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f"Bearer {api_key}"
-    }
-    body = {
-            "id": "850dc78d22d1d122335df2ca0872c754",
-            "name": a_record_name,
-            "type": "A",
-            "content": ip,
-            "ttl": 300,
-            "comment": "Rewsty Factorio",
-            "tags": []
-    }
-
-    response = httpx.put(request_url, json=body, headers=headers)
-
-    return response.status_code == 200
-
-
-
-current_ip = get_ip()
-valid_token = verify_token()
-
-if valid_token:
-    update_result = update_zone_record(zone_id, dns_record_id, current_ip)
-    if update_result:
-        print(f"Successfully updated zone record with value of: {current_ip}")
-    else:
-        print(f"Failed to update zone record with value of: {current_ip}")
+        log.failure("Exiting script due to failure grabbing IP.")
+else:
+    log.failure(f"A value was empty in the .env file, please fill in all values.")
